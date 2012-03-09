@@ -1,6 +1,7 @@
 // esi_M4557 demo
 //
-// 
+// TODO: Move "top" button up a bit in bitmap; And move its
+//       touch-screen hot-zone up to match (increase in x direction).
 
 #include <plib.h>       // PIC32 Peripheral library
 #include <stdint.h>
@@ -312,7 +313,9 @@ void esi_M4557()
     // Initialize graphics variables (this clears the buffer)
     gfxInit(128, 64, gfxBuf);
 
+    // Run calibration routine. Displays 2 dots; asks user to touch each.
     touchCalibration();
+
 
     // Touch Screen Test
     //testCal();  // Show coords & cross-hair of touches
@@ -320,7 +323,12 @@ void esi_M4557()
 
     while(1)
     {
-        // Copy top-level bitmap to display
+        // Copy top-level bitmap to display. Top level bitmap shows
+        // four options / buttons:
+        //    - Light
+        //    - Fan
+        //    - Heat
+        //    - Display
         memcpy(gfxBuf, esiDemoTop, 1024);
         lcdWriteBuffer(gfxBuf);
 
@@ -333,6 +341,10 @@ void esi_M4557()
 
 		touchWaitForRelease();   // Make sure last press is inactive
 
+        // This is a button press from top-level menu. See
+        // which button, and go to a "level" display for the
+        // appropriate item (Light, Fan, etc... )
+        //
         if(x > 2 && x < 30)        // Bottom 1/4 of touchscreen?
         {
             demoLevel("  Contrast", DEMO_CONTRAST);
@@ -353,7 +365,7 @@ void esi_M4557()
 }
 
 
-// Level demo - Show a level bar-graph, and buttons to allow
+// demoLevel - Show a level bar-graph, and buttons to allow
 //   increasing or decreasing the level. Also, a button to return
 //   to the top-level menu is present.
 //
@@ -415,8 +427,8 @@ void demoLevel(char *leftSideText, int demoNumber)
 	{
 		if(esiGetXY(&x,&y))
 		{
-			// See if this is an up or down button press
-			if(x > 2 && x <28)             // A press at bottom of touch screen?
+			// Is this an up or down button press (bottom of screen)?
+			if(x > 2 && x <24)
 			{
                 if(y > 2 && y < 25)        // Up button (left side of touch screen)?
                 {
@@ -429,40 +441,47 @@ void demoLevel(char *leftSideText, int demoNumber)
                     if(level < 0) level = 0;
                 }
 
-                // If this was a change of level, update the bargraph,
-                // and the item that we are controlling (PWM, contrast, etc).
-                //if(level != savedLevel[demoNumber])
-                {
-                    updateBarGraph(level);        // Show new level on bar graph
-                    switch(demoNumber)
-                    {
-                        case DEMO_LIGHT:          // Update PWM level
-                            SetDCOC2PWM(pwmTableLED[level]);
-                            break;
-                        case DEMO_FAN:            // Update PWM level
-                            SetDCOC3PWM(pwmTableFan[level]);
-                            break;
-                        case DEMO_HEAT:
-                            break;
-                        case DEMO_CONTRAST:
-                            // The LCD Controller IC's "volume" level is one of the
-                            // controls for the LCD's drive level. We init the value
-                            // to 35 (its valid range is 0..63). For our demo, map
-                            // our bar-graph level 0..15 to a range around our
-                            // default "volume", 28..42.
-                            lcdCmd(cVOLUME);  // LCD will expect volume level next
-                            lcdCmd(level + 28);
-                            break;
-                    }
-                }
 			}
-            else if(x > 96)  // Top 1/4 of touchscreen?
+            else if(x > 28 && x < 108)  // Bar graph area of touchscreen?
+            {
+                // The bar-graph bars are spaced 5px apart, and start
+                // somewhere around px 30. Figure out the level based on that.
+                level = ((x-30)/5) & 0x0f;
+            }
+            else if(x > 110)  // "Top" button (top portion of touchscreen)?
             {
 				break;       // Return to main menu
             }
             else
             {
                 // No button defined for this x,y location
+            }
+
+            // If this was a change of level, update the bargraph,
+            // and the item that we are controlling (PWM, contrast, etc).
+            //if(level != savedLevel[demoNumber])
+            {
+                updateBarGraph(level);        // Show new level on bar graph
+                switch(demoNumber)
+                {
+                    case DEMO_LIGHT:          // Update PWM level
+                        SetDCOC2PWM(pwmTableLED[level]);
+                        break;
+                    case DEMO_FAN:            // Update PWM level
+                        SetDCOC3PWM(pwmTableFan[level]);
+                        break;
+                    case DEMO_HEAT:
+                        break;
+                    case DEMO_CONTRAST:
+                        // The LCD Controller IC's "volume" level is one of the
+                        // controls for the LCD's drive level. We init the value
+                        // to 35 (its valid range is 0..63). For our demo, map
+                        // our bar-graph level 0..15 to a range around our
+                        // default "volume", 28..42.
+                        lcdCmd(cVOLUME);  // LCD will expect volume level next
+                        lcdCmd(level + 28);
+                        break;
+                }
             }
 		}
 		delay_ms(65);	
